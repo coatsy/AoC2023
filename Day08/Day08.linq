@@ -2,15 +2,15 @@
   <Namespace>System.Threading.Tasks</Namespace>
 </Query>
 
-async Task Main()
+void Main()
 {
-	var baseFolder = @"C:\Users\coats\source\repos\coatsy\AoC2023";
+	var baseFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), @"source\repos\coatsy\AoC2023");
 	var dayFolder = @"Day08";
 	//var inputFile = @"test.txt";
 	//var inputFile = @"test2.txt";
 	//var inputFile = @"test3.txt";
 	var inputFile = @"input.txt";
-	
+
 	inputFile.Dump("Data file");
 
 	var Nodes = new List<Node>();
@@ -19,18 +19,18 @@ async Task Main()
 	using (var file = File.OpenText(Path.Combine(baseFolder, dayFolder, inputFile)))
 	{
 		// read the directions
-		directions = await file.ReadLineAsync();
-		
+		directions = file.ReadLine();
+
 		// and a blank line
-		await file.ReadLineAsync();
-		
+		file.ReadLine();
+
 		// now read the nodes
 		while (!file.EndOfStream)
 		{
-			Nodes.Add(new Node(await file.ReadLineAsync()));
+			Nodes.Add(new Node(file.ReadLine()));
 		}
 	}
-	
+
 	// Now loop through the nodes and get the references for Left and Right
 	foreach (var node in Nodes)
 	{
@@ -56,21 +56,38 @@ async Task Main()
 
 	if (inputFile == @"test3.txt" || inputFile == @"input.txt")
 	{
-		var nodeSet = Nodes.Where(n => n.Id[2] == 'A').Select(n=> new NodeSteps {startNode = n, steps = 0ul}).ToList();
+		var nodeSet = Nodes.Where(n => n.Id[2] == 'A').Select(n => new NodeSteps { startNode = n.Id, steps = 0ul }).ToList();
 		foreach (var ns in nodeSet)
 		{
-			var thisNode = ns.startNode;
-			while (ns.steps == 0 || thisNode.Id != ns.startNode.Id)
+			ns.startNode.Dump();
+			var foundZ = false;
+			var zLoopCount = 0;
+			var thisNode = Nodes.FirstOrDefault(n => n.Id == ns.startNode);
+			while (true)
 			{
 				thisNode = thisNode.NextNode(directions[(int)(ns.steps % (ulong)directions.Length)]);
 				ns.steps++;
+				ns.loopCount += foundZ ? 1ul : 0ul;
+				if (thisNode.Id[2] == 'Z')
+				{
+					if (foundZ)
+					{
+						break;
+					}
+					else
+					{
+						foundZ = true;
+						ns.stepsToStartOfLoop = ns.steps;
+					}
+				}
 			}
+			
 		}
-		
-		var allSteps = nodeSet.Select(n=>n.steps).ToArray();
-		
+
+		var allSteps = nodeSet.Select(n => n.loopCount).ToArray();
+
 		var lcm = allSteps.Aggregate((a, b) => LCM(a, b));
-		
+
 		lcm.Dump("Total steps for parallel nodes");
 	}
 
@@ -120,17 +137,17 @@ public class Node
 	public string Right;
 	public Node LeftNode;
 	public Node RightNode;
-	
+
 	public bool IsStart => Id == "AAA";
 	public bool IsEnd => Id == "ZZZ";
-	
-	public Node (string nodeString)
+
+	public Node(string nodeString)
 	{
 		Id = nodeString.Substring(0, 3);
 		Left = nodeString.Substring(7, 3);
 		Right = nodeString.Substring(12, 3);
 	}
-	
+
 	public Node NextNode(char dir)
 	{
 		return dir == 'L' ? LeftNode : RightNode;
@@ -139,14 +156,16 @@ public class Node
 
 public class NodeSteps
 {
-	public Node startNode;
+	public string startNode;
 	public ulong steps;
+	public ulong loopCount;
+	public ulong stepsToStartOfLoop;
 }
 
 public static class ExtensionMethods
 {
 	public static bool AllFinished(this IEnumerable<Node> nodeSet)
 	{
-		return !nodeSet.Any(n=>n.Id[2] != 'Z');
+		return !nodeSet.Any(n => n.Id[2] != 'Z');
 	}
 }
